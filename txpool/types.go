@@ -25,7 +25,6 @@ import (
 	"math/bits"
 
 	"github.com/holiman/uint256"
-	"github.com/ledgerwatch/erigon-lib/chain"
 	"github.com/ledgerwatch/erigon-lib/common/length"
 	"github.com/ledgerwatch/erigon-lib/common/u256"
 	"github.com/ledgerwatch/erigon-lib/gointerfaces/types"
@@ -36,17 +35,11 @@ import (
 
 type TxParsseConfig struct {
 	chainID uint256.Int
-
-	protected  bool
-	accessList bool
-	dynamicFee bool
-	maleable   bool
 }
 
 // TxParseContext is object that is required to parse transactions and turn transaction payload into TxSlot objects
 // usage of TxContext helps avoid extra memory allocations
 type TxParseContext struct {
-	recCtx           *secp256k1.Context // Context for sender recovery
 	keccak1          hash.Hash
 	keccak2          hash.Hash
 	chainId, r, s, v uint256.Int // Signature values
@@ -61,7 +54,7 @@ type TxParseContext struct {
 	cfg TxParsseConfig
 }
 
-func NewTxParseContext(rules chain.Rules, chainID uint256.Int) *TxParseContext {
+func NewTxParseContext(chainID uint256.Int) *TxParseContext {
 	if chainID.IsZero() {
 		panic("wrong chainID")
 	}
@@ -69,31 +62,11 @@ func NewTxParseContext(rules chain.Rules, chainID uint256.Int) *TxParseContext {
 		withSender: true,
 		keccak1:    sha3.NewLegacyKeccak256(),
 		keccak2:    sha3.NewLegacyKeccak256(),
-		recCtx:     secp256k1.NewContext(),
 	}
 
-	switch {
-	case rules.IsLondon:
-		// All transaction types are still supported
-		ctx.cfg.protected = true
-		ctx.cfg.accessList = true
-		ctx.cfg.dynamicFee = true
-		ctx.cfg.chainID.Set(&chainID)
-		ctx.chainIDMul.Mul(&chainID, u256.N2)
-	case rules.IsBerlin:
-		ctx.cfg.protected = true
-		ctx.cfg.accessList = true
-		ctx.cfg.chainID.Set(&chainID)
-		ctx.chainIDMul.Mul(&chainID, u256.N2)
-	case rules.IsEIP155:
-		ctx.cfg.protected = true
-		ctx.cfg.chainID.Set(&chainID)
-		ctx.chainIDMul.Mul(&chainID, u256.N2)
-	case rules.IsHomestead:
-	default:
-		// Only allow malleable transactions in Frontier
-		ctx.cfg.maleable = true
-	}
+	// behave as of London enabled
+	ctx.cfg.chainID.Set(&chainID)
+	ctx.chainIDMul.Mul(&chainID, u256.N2)
 	return ctx
 }
 
@@ -438,7 +411,7 @@ func (ctx *TxParseContext) ParseTransaction(payload []byte, pos int, slot *TxSlo
 	binary.BigEndian.PutUint64(ctx.sig[56:64], ctx.s[0])
 	ctx.sig[64] = vByte
 	// recover sender
-	if _, err = secp256k1.RecoverPubkeyWithContext(ctx.recCtx, ctx.sighash[:], ctx.sig[:], ctx.buf[:0]); err != nil {
+	if _, err = secp256k1.RecoverPubkeyWithContext(secp256k1.DefaultContext, ctx.sighash[:], ctx.sig[:], ctx.buf[:0]); err != nil {
 		return 0, fmt.Errorf("%s: recovering sender from signature: %w", ParseTransactionErrorPrefix, err)
 	}
 	//apply keccak to the public key
@@ -482,6 +455,8 @@ func (s TxSlots) Valid() error {
 	return nil
 }
 
+var zeroAddr = make([]byte, 20)
+
 // Resize internal arrays to len=targetSize, shrinks if need. It rely on `append` algorithm to realloc
 func (s *TxSlots) Resize(targetSize uint) {
 	for uint(len(s.txs)) < targetSize {
@@ -494,9 +469,19 @@ func (s *TxSlots) Resize(targetSize uint) {
 		s.isLocal = append(s.isLocal, false)
 	}
 	//todo: set nil to overflow txs
+	oldLen := uint(len(s.txs))
 	s.txs = s.txs[:targetSize]
+	for i := oldLen; i < targetSize; i++ {
+		s.txs[i] = nil
+	}
 	s.senders = s.senders[:length.Addr*targetSize]
+	for i := oldLen; i < targetSize; i++ {
+		copy(s.senders.At(int(i)), zeroAddr)
+	}
 	s.isLocal = s.isLocal[:targetSize]
+	for i := oldLen; i < targetSize; i++ {
+		s.isLocal[i] = false
+	}
 }
 func (s *TxSlots) Append(slot *TxSlot, sender []byte, isLocal bool) {
 	n := len(s.txs)

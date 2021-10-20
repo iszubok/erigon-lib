@@ -679,6 +679,16 @@ func (p *TxPool) AddLocalTxs(ctx context.Context, newTransactions TxSlots) ([]Di
 	return reasons, nil
 }
 
+func (p *TxPool) NonceFromAddress(addr [20]byte) (nonce uint64, inPool bool) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	senderId, found := p.senders.id(string(addr[:]))
+	if !found {
+		return 0, false
+	}
+	return p.all.nonce(senderId), true
+}
+
 func (p *TxPool) coreDB() kv.RoDB {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -2030,11 +2040,4 @@ func min(a, b uint64) uint64 {
 		return a
 	}
 	return b
-}
-
-// GetNonceFromAddress gets a nonce from an address
-func GetNonceFromAddress(b *BySenderAndNonce, senders *sendersBatch, addr [20]byte) (nonce uint64, inPool bool) {
-	id, ok := senders.id(string(addr[:]))
-	// TODO: Modify the TxPool service and add this method as an rpc method if it's correct
-	return b.nonce(id), ok
 }

@@ -52,8 +52,13 @@ message StatusReply {
   uint32 baseFeeCount = 3;
 }
 
-message TransactionCountRequest {}
-message TransactionCountReply { uint64 nonce = 1; }
+message TransactionCountRequest {
+  types.H160 address = 1;
+}
+message TransactionCountReply {
+  bool found = 1;
+  uint64 nonce = 2;
+}
 
 service Txpool {
   // Version returns the service version number

@@ -48,6 +48,7 @@ type txPool interface {
 	deprecatedForEach(_ context.Context, f func(rlp, sender []byte, t SubPoolType), tx kv.Tx) error
 	CountContent() (int, int, int)
 	IdHashKnown(tx kv.Tx, hash []byte) (bool, error)
+	NonceFromAddress(addr [20]byte) (nonce uint64, inPool bool)
 }
 
 type GrpcServer struct {
@@ -235,9 +236,13 @@ func (s *GrpcServer) Status(_ context.Context, _ *txpool_proto.StatusRequest) (*
 
 // GetTransactionCount
 // TODO: Ask if the transaction pool can be passed in or if it has to be retrieved (maybe with the address or something)
-func (s *GrpcServer) GetTransactionCount(ctx context.Context, p *TxPool, address *types2.H160) (nonce uint64, inPool bool) {
-	addr := gointerfaces.ConvertH160toAddress(address)
-	return GetNonceFromAddress(p.all, p.senders, addr)
+func (s *GrpcServer) GetTransactionCount(ctx context.Context, in *txpool_proto.TransactionCountRequest) (*txpool_proto.TransactionCountReply, error) {
+	addr := gointerfaces.ConvertH160toAddress(in.Address)
+	nonce, inPool := s.txPool.NonceFromAddress(addr)
+	return &txpool_proto.TransactionCountReply{
+		Nonce: nonce,
+		Found: inPool,
+	}, nil
 }
 
 // NewSlotsStreams - it's safe to use this class as non-pointer

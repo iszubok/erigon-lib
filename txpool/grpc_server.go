@@ -234,8 +234,7 @@ func (s *GrpcServer) Status(_ context.Context, _ *txpool_proto.StatusRequest) (*
 	}, nil
 }
 
-// GetTransactionCount
-// TODO: Ask if the transaction pool can be passed in or if it has to be retrieved (maybe with the address or something)
+// GetTransactionCount gets the nonce from an account given the address of that account
 func (s *GrpcServer) GetTransactionCount(ctx context.Context, in *txpool_proto.TransactionCountRequest) (*txpool_proto.TransactionCountReply, error) {
 	addr := gointerfaces.ConvertH160toAddress(in.Address)
 	nonce, inPool := s.txPool.NonceFromAddress(addr)

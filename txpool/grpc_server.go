@@ -238,6 +238,7 @@ func (s *GrpcServer) Status(_ context.Context, _ *txpool_proto.StatusRequest) (*
 func (s *GrpcServer) GetTransactionCount(ctx context.Context, in *txpool_proto.TransactionCountRequest) (*txpool_proto.TransactionCountReply, error) {
 	addr := gointerfaces.ConvertH160toAddress(in.Address)
 	nonce, inPool := s.txPool.NonceFromAddress(addr)
+	fmt.Printf("Nonce and inPool: %v, %v\n", nonce, inPool)
 	return &txpool_proto.TransactionCountReply{
 		Nonce: nonce,
 		Found: inPool,

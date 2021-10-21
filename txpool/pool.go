@@ -682,7 +682,9 @@ func (p *TxPool) AddLocalTxs(ctx context.Context, newTransactions TxSlots) ([]Di
 func (p *TxPool) NonceFromAddress(addr [20]byte) (nonce uint64, inPool bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
+	fmt.Println(string(addr[:]))
 	senderId, found := p.senders.id(string(addr[:]))
+	fmt.Printf("Sender Id and found: %v, %v\n", senderId, found)
 	if !found {
 		return 0, false
 	}

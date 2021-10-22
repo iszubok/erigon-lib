@@ -354,9 +354,6 @@ func FuzzOnNewBlocks(f *testing.F) {
 				if tx.subPool&NoNonceGaps > 0 {
 					assert.GreaterOrEqual(i.nonce, senders[i.senderID].nonce, msg, i.senderID)
 				}
-				if tx.subPool&EnoughBalance > 0 {
-					//assert.True(tx.SenderHasEnoughBalance)
-				}
 				if tx.subPool&EnoughFeeCapProtocol > 0 {
 					assert.LessOrEqual(calcProtocolBaseFee(pendingBaseFee), tx.Tx.feeCap, msg)
 				}
@@ -366,8 +363,7 @@ func FuzzOnNewBlocks(f *testing.F) {
 
 				// side data structures must have all txs
 				assert.True(pool.all.has(tx), msg)
-				_, ok = pool.byHash[string(i.idHash[:])]
-				assert.True(ok)
+				assert.Contains(pool.byHash, string(i.idHash[:]), msg)
 
 				// pools can't have more then 1 tx with same SenderID+Nonce
 				iterateSubPoolUnordered(baseFee, func(mtx2 *metaTx) {
@@ -393,9 +389,6 @@ func FuzzOnNewBlocks(f *testing.F) {
 				if tx.subPool&NoNonceGaps > 0 {
 					assert.GreaterOrEqual(i.nonce, senders[i.senderID].nonce, msg)
 				}
-				if tx.subPool&EnoughBalance != 0 {
-					//assert.True(tx.SenderHasEnoughBalance, msg)
-				}
 				if tx.subPool&EnoughFeeCapProtocol > 0 {
 					assert.LessOrEqual(calcProtocolBaseFee(pendingBaseFee), tx.Tx.feeCap, msg)
 				}
@@ -404,24 +397,17 @@ func FuzzOnNewBlocks(f *testing.F) {
 				}
 
 				assert.True(pool.all.has(tx), msg)
-				_, ok = pool.byHash[string(i.idHash[:])]
-				assert.True(ok, msg)
+				assert.Contains(pool.byHash, string(i.idHash[:]), msg)
 			})
 
 			best, worst = queued.Best(), queued.Worst()
 			assert.LessOrEqual(queued.Len(), cfg.QueuedSubPoolLimit)
 			assert.False(worst != nil && best == nil, msg)
 			assert.False(worst == nil && best != nil, msg)
-			//if worst != nil && worst.subPool <= 0b1111 {
-			//	t.Fatalf("queued worst too small %b", worst.subPool)
-			//}
 			iterateSubPoolUnordered(queued, func(tx *metaTx) {
 				i := tx.Tx
 				if tx.subPool&NoNonceGaps > 0 {
 					assert.GreaterOrEqual(i.nonce, senders[i.senderID].nonce, msg, i.senderID, senders[i.senderID].nonce)
-				}
-				if tx.subPool&EnoughBalance > 0 {
-					//assert.True(tx.SenderHasEnoughBalance, msg)
 				}
 				if tx.subPool&EnoughFeeCapProtocol > 0 {
 					assert.LessOrEqual(calcProtocolBaseFee(pendingBaseFee), tx.Tx.feeCap, msg)
@@ -431,8 +417,7 @@ func FuzzOnNewBlocks(f *testing.F) {
 				}
 
 				assert.True(pool.all.has(tx), "%s, %d, %x", msg, tx.Tx.nonce, tx.Tx.idHash)
-				_, ok = pool.byHash[string(i.idHash[:])]
-				assert.True(ok, msg)
+				assert.Contains(pool.byHash, string(i.idHash[:]), msg)
 				assert.GreaterOrEqual(tx.Tx.feeCap, pool.cfg.MinFeeCap)
 			})
 
@@ -442,7 +427,6 @@ func FuzzOnNewBlocks(f *testing.F) {
 				assert.True(txn.worstIndex >= 0, msg)
 			}
 			for id := range senders {
-				//assert.True(senders[i].all.Len() > 0)
 				pool.all.ascend(id, func(mt *metaTx) bool {
 					require.True(mt.worstIndex >= 0, msg)
 					assert.True(mt.bestIndex >= 0, msg)
@@ -452,8 +436,7 @@ func FuzzOnNewBlocks(f *testing.F) {
 
 			// mined txs must be removed
 			for i := range minedTxs.txs {
-				_, ok = pool.byHash[string(minedTxs.txs[i].idHash[:])]
-				assert.False(ok, msg)
+				assert.NotContains(pool.byHash, string(minedTxs.txs[i].idHash[:]))
 			}
 
 			if queued.Len() > 3 {

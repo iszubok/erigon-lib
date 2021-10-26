@@ -29,6 +29,9 @@ func FuzzParseTx(f *testing.F) {
 		ctx := NewTxParseContext(*u256.N1)
 		txn := &TxSlot{}
 		sender := make([]byte, 20)
-		_, _ = ctx.ParseTransaction(in, pos, txn, sender)
+		_, err := ctx.ParseTransaction(in, pos, txn, sender)
+		if err != nil {
+			t.Skip()
+		}
 	})
 }

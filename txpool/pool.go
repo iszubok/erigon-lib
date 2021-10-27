@@ -679,14 +679,45 @@ func (p *TxPool) AddLocalTxs(ctx context.Context, newTransactions TxSlots) ([]Di
 	return reasons, nil
 }
 
-func (p *TxPool) NonceFromAddress(addr [20]byte) (nonce uint64, inPool bool) {
+func (p *TxPool) NonceFromAddress(ctx context.Context, addr [20]byte) (nonce uint64, inPool bool) {
+	fmt.Printf("Addr is: %v\n", addr)
+	fmt.Printf("String Addr is: %x\n", string(addr[:]))
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	senderId, found := p.senders.id(string(addr[:]))
+	fmt.Printf("Sender Id and found is: %v, %v\n", senderId, found)
 	if !found {
-		return 0, false
+		coreTx, err := p.coreDB().BeginRo(ctx)
+		if err != nil {
+			fmt.Println("Error came about")
+			return 0, false
+		}
+		newNonce := nonceFromPlainState(coreTx, addr)
+		fmt.Printf("New Nonce is: %v\n", newNonce)
+		return newNonce, true // TODO: change inPool to false after testing
 	}
 	return p.all.nonce(senderId), true
+}
+
+func nonceFromPlainState(tx kv.Tx, addr [20]byte) uint64 {
+	enc, err := tx.GetOne(kv.PlainState, addr[:])
+	if err != nil || len(enc) == 0 {
+		err = tx.ForAmount(kv.PlainState, nil, 10, func(k, v []byte) error {
+			if len(k) == 20 {
+				fmt.Printf("k=%x,v=%x\n", k, v)
+			}
+			return nil
+		})
+		fmt.Printf("Error is: %v", err)
+		fmt.Printf("Enc is: %v", enc)
+		return 0
+	}
+	nonce, _, err2 := DecodeSender(enc)
+	if err2 != nil {
+		fmt.Printf("Error 2 is: %v", err2)
+		return 0
+	}
+	return nonce
 }
 
 func (p *TxPool) coreDB() kv.RoDB {
